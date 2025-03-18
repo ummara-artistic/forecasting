@@ -15,7 +15,6 @@ st.title("📊 Supply Chain Forecasting Dashboard")
 
 
 # Load Data from JSON
-# Load Data from JSON
 file_path = r"D:\stock_forecasting\data\cust_stock.json"
 
 try:
