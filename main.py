@@ -51,7 +51,11 @@ st.set_page_config(layout="wide")
 st.title("📊 Supply Chain Forecasting Dashboard")
 
 # Load Data from JSON
-file_path = r"D:\stock_forecasting\data\cust_stock.json"
+file_path = os.path.join(os.getcwd(), "data", "cust_stock.json")
+
+if not os.path.exists(file_path):
+    raise FileNotFoundError(f"File not found: {file_path}. Please check the path and try again.")
+
 
 try:
     with open(file_path, "r") as file:
