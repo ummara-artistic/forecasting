@@ -51,7 +51,7 @@ st.set_page_config(layout="wide")
 st.title("📊 Supply Chain Forecasting Dashboard")
 
 # Load Data from JSON
-file_path = r"D:\stock_forecasting\cust_stock.json"
+file_path = r"D:\stock_forecasting\data\cust_stock.json"
 
 try:
     with open(file_path, "r") as file:
