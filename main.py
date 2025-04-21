@@ -186,6 +186,42 @@ else:
 # Plotting the first chart
 st.plotly_chart(fig1, use_container_width=True)
 
+
+# === Treemap / Sunburst Visualization ===
+st.subheader("🗺️ Inventory Breakdown by Category")
+
+chart_type = st.selectbox("Select Chart Type", ["Treemap", "Sunburst"])
+
+metric = st.selectbox("Select Metric to Visualize", ["qty", "stockvalue"])
+category_level = st.multiselect("Group By (Hierarchy)", ["major", "fabtype", "description"], default=["major", "description"])
+
+if len(category_level) < 1:
+    st.warning("Please select at least one category to group by.")
+else:
+    if chart_type == "Treemap":
+        fig = px.treemap(
+            df,
+            path=category_level,
+            values=metric,
+            color=metric,
+            color_continuous_scale="Viridis",
+            title=f"Treemap of {metric} by {' > '.join(category_level)}"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif chart_type == "Sunburst":
+        fig = px.sunburst(
+            df,
+            path=category_level,
+            values=metric,
+            color=metric,
+            color_continuous_scale="Blues",
+            title=f"Sunburst Chart of {metric} by {' > '.join(category_level)}"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+
+
 # === Prediction for 2025 Inventory Demand ===
 st.subheader("🔮 2025 Forecast: Items Likely to Be Bought Again")
 
@@ -216,6 +252,45 @@ fig2 = px.bar(forecast_df, x="forecast_qty", y="description", color="forecast_qt
 fig2.update_layout(yaxis={'categoryorder': 'total ascending'})
 
 st.plotly_chart(fig2, use_container_width=True)
+
+
+# === Animated Bar Chart: Monthly Stock Value by Major Category ===
+st.subheader("📽️ Animated Bar Chart: Monthly Stock Value by Major Category")
+
+# Aggregate stockvalue per month and major
+monthly_major_stock = (
+    df.groupby(["year_month", "major"])["stockvalue"]
+    .sum()
+    .reset_index()
+)
+
+# Rank majors within each month to only show top N in animation
+top_n = 10
+monthly_major_stock["rank"] = monthly_major_stock.groupby("year_month")["stockvalue"].rank("dense", ascending=False)
+monthly_major_stock = monthly_major_stock[monthly_major_stock["rank"] <= top_n]
+
+# Plotly Animated Bar Chart
+fig = px.bar(
+    monthly_major_stock,
+    x="stockvalue",
+    y="major",
+    color="major",
+    orientation="h",
+    animation_frame="year_month",
+    range_x=[0, monthly_major_stock["stockvalue"].max() * 1.1],
+    title="Top 10 Major Categories by Stock Value Over Time",
+    labels={"stockvalue": "Stock Value", "major": "Category"},
+    height=600
+)
+
+fig.update_layout(
+    yaxis={'categoryorder': 'total ascending'},
+    showlegend=False,
+    xaxis_title="Stock Value",
+    yaxis_title="Major Category"
+)
+
+st.plotly_chart(fig, use_container_width=True)
 
 
 
