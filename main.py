@@ -128,9 +128,10 @@ col1, col2, col3 = st.columns(3)
 col1.markdown(
     f"""
     <div style="background-color:#f4f4f4; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); text-align:center;">
-        <h3>📦 Total Stock Quantity</h3>
-        <p style="font-size: 24px; font-weight: bold;">{total_stock:,}</p>
-    </div>
+    <h3 style="color: black;">📦 Total Stock Quantity</h3>
+    <p style="font-size: 24px; font-weight: bold; color: black;">{total_stock:,}</p>
+</div>
+
     """, unsafe_allow_html=True
 )
 
@@ -138,9 +139,9 @@ col1.markdown(
 col2.markdown(
     f"""
     <div style="background-color:#f4f4f4; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); text-align:center;">
-        <h3>💰 Total Inventory Value</h3>
-        <p style="font-size: 24px; font-weight: bold;">${total_value:,.2f}</p>
-    </div>
+    <h3 style="color: black;">💰 Total Inventory Value</h3>
+    <p style="font-size: 24px; font-weight: bold; color: black;">{total_stock:,}</p>
+</div>
     """, unsafe_allow_html=True
 )
 
@@ -148,11 +149,14 @@ col2.markdown(
 col3.markdown(
     f"""
     <div style="background-color:#f4f4f4; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); text-align:center;">
-        <h3>⏳ Avg Stock Age</h3>
-        <p style="font-size: 24px; font-weight: bold;">{avg_stock_age:.1f} days</p>
-    </div>
+    <h3 style="color: black;">⏳ Avg Stock Age</h3>
+    <p style="font-size: 24px; font-weight: bold; color: black;">{total_stock:,}</p>
+</div>
     """, unsafe_allow_html=True
 )
+
+
+
 
 
 
