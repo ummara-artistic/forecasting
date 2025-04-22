@@ -116,7 +116,6 @@ with st.sidebar.expander("📊 Inventory Analysis"):
 
 
 
-# === KPIs ===
 total_stock = df["qty"].sum()
 total_value = df["stockvalue"].sum()
 avg_stock_age = df[["aging_60", "aging_90", "aging_180", "aging_180plus"]].sum(axis=1).mean()
@@ -154,6 +153,7 @@ col3.markdown(
 </div>
     """, unsafe_allow_html=True
 )
+
 
 
 
