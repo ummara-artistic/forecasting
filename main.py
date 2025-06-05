@@ -376,20 +376,28 @@ with r1c3:
     with st.expander("📘 Story behind this"):
         st.markdown("""
         - This graph displays the forecasted monthly demand (quantity) for a selected item from January to December 2025 using linear regression.
-        - The model learns from historical monthly quantities to predict future values.
+        - The model learns from historical monthly quantities starting from 2021 to predict future values.
         """)
 
     df_desc = df[df["description"] == selected_desc]
+
+    # Group by month and sum qty
     ts_monthly = df_desc.groupby(df_desc["txndate"].dt.to_period("M")).agg({"qty": "sum"})["qty"]
     ts_monthly.index = ts_monthly.index.to_timestamp()
 
+    # Filter to only 2021 and onward
+    ts_monthly = ts_monthly[ts_monthly.index >= pd.Timestamp("2021-01-01")]
+
     if len(ts_monthly) < 24:
-        st.warning("Not enough historical data for reliable forecasting")
+        st.warning("Not enough historical data for reliable forecasting from 2021 onwards")
     else:
+        # Run forecast based on filtered data
         linear_pred = linear_forecast(ts_monthly, steps=12)
-        months = pd.date_range(start="2025-01-01", periods=12, freq="MS")
+
+        # Generate forecast months explicitly for Jan 2025 to Dec 2025
+        forecast_months = pd.date_range(start="2025-01-01", periods=12, freq="MS")
         forecast_df = pd.DataFrame({
-            "Month": months.strftime("%b"),
+            "Month": forecast_months.strftime("%b"),
             "Forecasted Quantity": linear_pred.values
         })
 
@@ -399,13 +407,14 @@ with r1c3:
             y="Forecasted Quantity",
             markers=True,
             text="Forecasted Quantity",
-            title="Forecast Quantities Monthly",
+            title="Forecast Quantities Monthly (Jan-Dec 2025)",
             template="plotly_dark"
         )
         fig.update_traces(texttemplate='%{text:.0f}', textposition='top center')
         fig.update_layout(xaxis=dict(tickmode='array', tickvals=forecast_df["Month"]), showlegend=False)
 
         st.plotly_chart(fig, use_container_width=True)
+
 
         
 
