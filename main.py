@@ -336,30 +336,31 @@ with r1c2:
 # ------------------- FORECASTING FUNCTIONS -------------------
 
 
-def sarimax_forecast(ts, order=(1,1,1), seasonal_order=(1,1,1,12), steps=12):
+from statsmodels.tsa.arima.model import ARIMA
+
+def arima_forecast(ts, order=(1,1,1), steps=12):
     try:
-        model = SARIMAX(ts, order=order, seasonal_order=seasonal_order,
-                        enforce_stationarity=False, enforce_invertibility=False)
-        model_fit = model.fit(disp=False)
+        model = ARIMA(ts, order=order)
+        model_fit = model.fit()
         forecast = model_fit.forecast(steps=steps)
         return forecast
     except Exception as e:
-        st.error(f"SARIMAX model error: {e}")
+        st.error(f"ARIMA model error: {e}")
         return pd.Series([np.nan]*steps)
+
 
 
 with r1c3:
     st.header("Forecast Quantity Month-Wise")                                      
     descriptions = df["description"].unique()
     selected_desc = st.selectbox("Select Item Description for Forecasting", sorted(descriptions), key="forecast_desc")
-    with st.expander("📘 Story behind this"):
-   
-     st.markdown("""
     
-    -This graph displays the forecasted monthly demand (quantity) for a selected item from January to December 2025 by using Sarimax in it to get historical pattern and
-                 learn from it to predict fo future values
-      
-    """)
+    with st.expander("📘 Story behind this"):
+        st.markdown("""
+        - This graph displays the forecasted monthly demand (quantity) for a selected item from January to December 2025.
+        - We are using the ARIMA model to capture trends in historical demand and forecast future quantities.
+        """)
+
     df_desc = df[df["description"] == selected_desc]
     ts_monthly = df_desc.groupby(df_desc["txndate"].dt.to_period("M")).agg({"qty": "sum"})["qty"]
     ts_monthly.index = ts_monthly.index.to_timestamp()
@@ -367,11 +368,11 @@ with r1c3:
     if len(ts_monthly) < 24:
         st.warning("Not enough historical data for reliable forecasting")
     else:
-        sarimax_pred = sarimax_forecast(ts_monthly, steps=12)
+        arima_pred = arima_forecast(ts_monthly, steps=12)
         months = pd.date_range(start="2025-01-01", periods=12, freq="MS")
         forecast_df = pd.DataFrame({
             "Month": months.strftime("%b"),
-            "Forecasted Quantity": sarimax_pred.values
+            "Forecasted Quantity": arima_pred.values
         })
 
         fig = px.line(
@@ -380,31 +381,18 @@ with r1c3:
             y="Forecasted Quantity",
             markers=True,
             text="Forecasted Quantity",
-            title="Forescast Quantities Monthly",
+            title="Forecast Quantities Monthly",
             template="plotly_dark"
         )
         fig.update_traces(texttemplate='%{text:.0f}', textposition='top center')
         fig.update_layout(xaxis=dict(tickmode='array', tickvals=forecast_df["Month"]), showlegend=False)
 
         st.plotly_chart(fig, use_container_width=True)
-        
+
 
 # ------------------- 2nd ROW: Additional 6 Graphs -------------------
 
-def sarimax_forecast(ts, steps=12):
-    """
-    Dummy sarimax forecast function.
-    Replace this with your real SARIMAX model forecasting logic.
-    Should return a pd.Series indexed by timestamps (monthly)
-    """
-    # For demo, repeat last value or use some trend
-    last_val = ts.iloc[-1]
-    index = pd.date_range(start=ts.index[-1] + pd.offsets.MonthBegin(),
-                          periods=steps, freq='MS')
-    forecast_values = pd.Series([last_val * 1.05 ** i for i in range(1, steps+1)], index=index)
-    return forecast_values
 
-# Simulate loading your data
 
 
 
@@ -417,7 +405,7 @@ def forecast_all_descriptions(df, steps=12):
         ts.index = ts.index.to_timestamp()
         if len(ts) < 24:
             continue
-        fcast = sarimax_forecast(ts, steps=steps)
+        fcast = arima_forecast(ts, steps=steps)
         forecast_data[d] = fcast.sum()
     return forecast_data
 
