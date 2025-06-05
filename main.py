@@ -99,23 +99,18 @@ st.markdown("<hr style='border-top: 3px solid #2575fc;'>", unsafe_allow_html=Tru
 # ----------- Load Data -----------
 
 
+import pandas as pd
+import json
+import os
 
-@st.cache_data(show_spinner=False)
-def load_data(file_path):
-    with open(file_path, "r") as f:
-        raw_data = json.load(f)
-    return pd.DataFrame(raw_data["items"])
+# Convert JSON to Parquet
+file_path = os.path.join("data", "cust_stock.json")
+with open(file_path, "r") as f:
+    raw_data = json.load(f)
 
-# Define the file path
-file_path = os.path.join(os.getcwd(), "data", "cust_stock.json")
+df = pd.DataFrame(raw_data["items"])
+df.to_parquet("data/cust_stock.parquet", index=False)
 
-# Check if file exists
-if not os.path.exists(file_path):
-    st.error("File not found: cust_stock.json")
-    st.stop()
-
-# Load data using the cached function
-df = load_data(file_path)
 
 
 # Preprocessing
