@@ -97,6 +97,7 @@ st.markdown("<hr style='border-top: 3px solid #2575fc;'>", unsafe_allow_html=Tru
 
 # ------------------- LOAD AND PREPROCESS DATA -------------------
 # ----------- Load Data -----------
+
 file_path = os.path.join(os.getcwd(), "data", "cust_stock.json")
 
 if not os.path.exists(file_path):
@@ -180,6 +181,7 @@ with st.expander("KPIS"):
     """)
 
 #----------------------------------------------------For KPIS-----------------------------------
+
 # Filter the data
 df_2024 = df[df["year"] == 2024]
 train_df = df[df["year"] < 2024]
@@ -376,7 +378,7 @@ with r1c3:
         
 
 # ------------------- 2nd ROW: Additional 6 Graphs -------------------
-
+@st.cache_data
 def sarimax_forecast(ts, steps=12):
     """
     Dummy sarimax forecast function.
@@ -439,6 +441,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+@st.cache_data
 # Forecast function
 def forecast_qty_linear_reg(item_df):
     model = LinearRegression()
@@ -608,13 +611,14 @@ with row1_col3:
 
 
 # Forecast helper function
+@st.cache_data
 def sarimax_forecast(ts, steps=12):
     from statsmodels.tsa.statespace.sarimax import SARIMAX
     model = SARIMAX(ts, order=(1,1,1), seasonal_order=(1,1,1,12), enforce_stationarity=False, enforce_invertibility=False)
     results = model.fit(disp=False)
     forecast = results.get_forecast(steps=steps)
     return forecast.predicted_mean
-
+@st.cache_data
 # 1) Total monthly predicted quantity for 2025
 def forecast_monthly_2025(df, steps=12):
     monthly_forecasts = []
