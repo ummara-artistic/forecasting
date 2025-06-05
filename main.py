@@ -30,16 +30,16 @@ from datetime import timedelta
 
 # ------------------- PAGE CONFIG -------------------
 st.set_page_config(page_title="🎨 Stock Forecasting Analysis", layout="wide")
-with st.expander("📍 Sticky Note 1: Dashboard Overview"):
+with st.expander("📍  Dashboard Overview"):
     st.markdown("""
-    data processing use txndate , chnge to utc format 
+   We did data processing use txndate , chnge to utc format 
 sort values through sort value builtin function sort the rows of data frame by column name
 inplace=true, sort wil modify the original dataframe and return a new sorted data frame
 define default value for lead time
 for lead time stock , we get the formula of =  qty - ( daily demand * leadtime)
 for daily demand = qty / 30 
 
-for forecasting we filter data by 2024 only ing
+For forecasting we filter data by 2024 only ing
         - Turnover rates
     """)
 
@@ -206,9 +206,9 @@ pred_lead_2025 = model_lead.predict(test_df[features]).mean()
 
 
 k1, k2, k3, k4 = st.columns(4)
-k1.metric("🛒 Total Quantity 2025", f"{pred_qty_2025:.0f}")
-k2.metric("📊 Avg Daily Demand 2025", f"{pred_demand_2025:.2f}")
-k3.metric("⏳ Avg Lead Time Stock 2025", f"{pred_lead_2025:.2f}")
+k1.metric("🛒 Predicted Total Quantity 2025", f"{pred_qty_2025:.0f}")
+k2.metric("📊 Predicted Avg Daily Demand 2025", f"{pred_demand_2025:.2f}")
+k3.metric("⏳ Predicted Avg Lead Time Stock 2025", f"{pred_lead_2025:.2f}")
 
 
 
@@ -351,7 +351,7 @@ with r1c3:
     ts_monthly.index = ts_monthly.index.to_timestamp()
 
     if len(ts_monthly) < 24:
-        st.warning("Not enough historical data for reliable forecasting. Need at least 24 months.")
+        st.warning("Not enough historical data for reliable forecasting")
     else:
         sarimax_pred = sarimax_forecast(ts_monthly, steps=12)
         months = pd.date_range(start="2025-01-01", periods=12, freq="MS")
@@ -694,6 +694,10 @@ fig_scatter = px.scatter(
         "Predicted_Total_Qty_2025": "Predicted Qty"
     }
 )
+
+
+
+
 with row2_col2:
     st.header("Turnover Ratio vs Predicted Quantity")
     st.plotly_chart(fig_scatter, use_container_width=True)
@@ -796,3 +800,102 @@ Predicts the next month’s stock value.
 
 
         """)
+
+
+
+st.title("📦 Inventory Analytics & Forecasting Dashboard")
+
+# Select item
+item_options = filtered_data["description"].unique()
+selected_item = st.selectbox("🔍 Select Inventory Item", item_options)
+
+item_data = filtered_data[filtered_data["description"] == selected_item].copy()
+item_data = item_data.set_index("txndate").asfreq('D')  # daily freq, fill missing dates
+item_data["qty"] = item_data["qty"].fillna(method='ffill')
+
+# Aggregate daily data to monthly for SARIMAX
+monthly_data = item_data["qty"].resample('MS').sum()
+
+# SARIMAX Model Forecast
+try:
+    model = SARIMAX(monthly_data, order=(1, 1, 1), seasonal_order=(1, 1, 1, 12))
+    results = model.fit(disp=False)
+
+    forecast_periods = 12
+    forecast = results.get_forecast(steps=forecast_periods)
+    forecast_index = pd.date_range(start=monthly_data.index[-1] + pd.offsets.MonthBegin(1), periods=forecast_periods, freq='MS')
+    forecast_values = forecast.predicted_mean.values
+
+except Exception as e:
+    st.error(f"Forecasting error: {e}")
+    forecast_values = [monthly_data.iloc[-1]] * 12  # fallback to stagnant qty
+    forecast_index = pd.date_range(start=monthly_data.index[-1] + pd.offsets.MonthBegin(1), periods=12, freq='MS')
+
+# Inventory Value Depreciation Forecast (5% monthly)
+latest_stockvalue = item_data["stockvalue"].dropna().iloc[-1]
+depreciation_rate = 0.05
+depreciated_values = [latest_stockvalue * ((1 - depreciation_rate) ** i) for i in range(forecast_periods)]
+
+# Create Plotly figures
+
+# Graph 1: Inventory Value Depreciation
+fig_depreciation = go.Figure()
+fig_depreciation.add_trace(go.Scatter(
+    x=forecast_index, y=depreciated_values,
+    mode='lines+markers',
+    name='Inventory Value'
+))
+fig_depreciation.update_layout(
+    title=f"📉 Inventory Value Depreciation (5% Monthly) for '{selected_item}'",
+    xaxis_title='Date',
+    yaxis_title='Inventory Value',
+    template='plotly_white'
+)
+
+# Graph 2: Stock Quantity Forecast
+fig_stock = go.Figure()
+fig_stock.add_trace(go.Scatter(
+    x=monthly_data.index, y=monthly_data.values,
+    mode='lines+markers',
+    name='Historical Qty'
+))
+fig_stock.add_trace(go.Scatter(
+    x=forecast_index, y=forecast_values,
+    mode='lines+markers',
+    name='Forecasted Qty'
+))
+fig_stock.update_layout(
+    title=f"🚫 Stock Movement Insight & Forecast for '{selected_item}'",
+    xaxis_title='Date',
+    yaxis_title='Quantity (KGS)',
+    template='plotly_white'
+)
+
+# Display plots side by side
+col1, col2 = st.columns(2)
+with col1:
+    st.plotly_chart(fig_depreciation, use_container_width=True)
+with col2:
+    st.plotly_chart(fig_stock, use_container_width=True)
+
+# Add explanation expander
+with st.expander("📘 Story behind this"):
+    st.markdown("""
+    This forecasting system is designed to provide actionable insights on inventory management for selected items.
+
+    **Inventory Value Depreciation:**  
+    We assume a simple 5% monthly depreciation rate to account for storage costs, spoilage, or obsolescence. This helps forecast the potential reduction in the monetary value of unsold inventory over time.
+
+    **Stock Movement Insight and Forecast:**  
+    Using a SARIMAX time series model, we analyze the historical monthly quantity data to predict stock movement trends for the year 2025.  
+    - The model captures both seasonality and trends in the stock quantity and forecast data for potential growth or decline
+
+    **How it works:**  
+    1. Historical daily data is aggregated monthly.  
+    2. SARIMAX fits the historical quantity series to capture trend and seasonality.  
+    3. Forecasts are generated for the next 12 months (2025).  
+    4. The depreciation forecast is calculated independently, assuming a fixed monthly percentage decrease in stock value.  
+    5. Both graphs provide a comprehensive view of inventory health and future outlook.
+
+    Use these insights to optimize inventory orders, pricing, and promotional strategies.
+    """)
