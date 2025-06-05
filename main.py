@@ -99,18 +99,23 @@ st.markdown("<hr style='border-top: 3px solid #2575fc;'>", unsafe_allow_html=Tru
 # ----------- Load Data -----------
 
 
-import pandas as pd
-import json
-import os
 
-# Convert JSON to Parquet
-file_path = os.path.join("data", "cust_stock.json")
-with open(file_path, "r") as f:
-    raw_data = json.load(f)
+@st.cache_data(show_spinner=False)
+def load_data(file_path):
+    with open(file_path, "r") as f:
+        raw_data = json.load(f)
+    return pd.DataFrame(raw_data["items"])
 
-df = pd.DataFrame(raw_data["items"])
-df.to_parquet("data/cust_stock.parquet", index=False)
+# Define the file path
+file_path = os.path.join(os.getcwd(), "data", "cust_stock.json")
 
+# Check if file exists
+if not os.path.exists(file_path):
+    st.error("File not found: cust_stock.json")
+    st.stop()
+
+# Load data using the cached function
+df = load_data(file_path)
 
 
 # Preprocessing
@@ -327,7 +332,7 @@ with r1c2:
 # --- Forecasting section for selected description with SARIMAX ---
 # ------------------- FORECASTING FUNCTIONS -------------------
 
-@st.cache_data(show_spinner=False)
+
 def sarimax_forecast(ts, order=(1,1,1), seasonal_order=(1,1,1,12), steps=12):
     try:
         model = SARIMAX(ts, order=order, seasonal_order=seasonal_order,
@@ -382,7 +387,7 @@ with r1c3:
         
 
 # ------------------- 2nd ROW: Additional 6 Graphs -------------------
-@st.cache_data
+
 def sarimax_forecast(ts, steps=12):
     """
     Dummy sarimax forecast function.
@@ -399,7 +404,7 @@ def sarimax_forecast(ts, steps=12):
 # Simulate loading your data
 
 
-@st.cache_data(show_spinner=False)
+
 def forecast_all_descriptions(df, steps=12):
     forecast_data = {}
     desc_list = df["description"].unique()
@@ -445,7 +450,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-@st.cache_data
+
 # Forecast function
 def forecast_qty_linear_reg(item_df):
     model = LinearRegression()
@@ -489,10 +494,6 @@ aging_labels = {
 df_2024['date'] = pd.date_range(start='2024-01-01', periods=len(df_2024), freq='MS')
 
 
-import streamlit as st
-import pandas as pd
-from statsmodels.tsa.arima.model import ARIMA
-import plotly.graph_objects as go
 
 # Assume df_2024, aging_options, aging_labels are predefined
 
@@ -615,14 +616,17 @@ with row1_col3:
 
 
 # Forecast helper function
-@st.cache_data
+
 def sarimax_forecast(ts, steps=12):
     from statsmodels.tsa.statespace.sarimax import SARIMAX
     model = SARIMAX(ts, order=(1,1,1), seasonal_order=(1,1,1,12), enforce_stationarity=False, enforce_invertibility=False)
     results = model.fit(disp=False)
     forecast = results.get_forecast(steps=steps)
     return forecast.predicted_mean
-@st.cache_data
+
+
+
+
 # 1) Total monthly predicted quantity for 2025
 def forecast_monthly_2025(df, steps=12):
     monthly_forecasts = []
@@ -702,7 +706,6 @@ fig_scatter = px.scatter(
         "Predicted_Total_Qty_2025": "Predicted Qty"
     }
 )
-
 
 
 
