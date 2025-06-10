@@ -887,48 +887,6 @@ import pandas as pd
 import numpy as np
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-st.title("📦 Inventory Analytics & Forecasting Dashboard")
-
-# Select item
-item_options = filtered_data["description"].unique()
-selected_item = st.selectbox("🔍 Select Inventory Item", item_options)
-
-# Filter item data
-item_data = filtered_data[filtered_data["description"] == selected_item].copy()
-item_data["txndate"] = pd.to_datetime(item_data["txndate"])
-item_data = item_data.set_index("txndate").asfreq('D')  # daily frequency
-item_data["qty"] = item_data["qty"].fillna(method='ffill')
-
-# Aggregate to monthly data
-monthly_data = item_data["qty"].resample('MS').sum()
-
-# Holt-Winters Forecast (simpler than SARIMAX)
-forecast_periods = 12
-try:
-    model = ExponentialSmoothing(monthly_data, trend='add', seasonal='add', seasonal_periods=12)
-    results = model.fit()
-    forecast_index = pd.date_range(start=monthly_data.index[-1] + pd.offsets.MonthBegin(1), 
-                                   periods=forecast_periods, freq='MS')
-    forecast_values = results.forecast(forecast_periods)
-except Exception as e:
-    st.error(f"Forecasting error: {e}")
-    forecast_values = [monthly_data.iloc[-1]] * forecast_periods  # fallback
-    forecast_index = pd.date_range(start=monthly_data.index[-1] + pd.offsets.MonthBegin(1), 
-                                   periods=forecast_periods, freq='MS')
-
-# Inventory Value Depreciation Forecast (5% monthly)
-latest_stockvalue = item_data["stockvalue"].dropna().iloc[-1] if not item_data["stockvalue"].dropna().empty else 0
-depreciation_rate = 0.05
-depreciated_values = [latest_stockvalue * ((1 - depreciation_rate) ** i) for i in range(forecast_periods)]
-
-# Optional: Show forecast
-forecast_df = pd.DataFrame({
-    "Forecast Date": forecast_index,
-    "Predicted Qty": forecast_values,
-    "Estimated Value": depreciated_values
-})
-st.subheader("📈 Forecast")
-st.dataframe(forecast_df)
 
 
 # Create Plotly figures
