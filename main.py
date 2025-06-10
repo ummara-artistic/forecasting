@@ -6,6 +6,23 @@ import numpy as np
 import plotly.express as px
 from datetime import datetime
 from sklearn.ensemble import RandomForestClassifier
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+import plotly.express as px
+import pandas as pd
+import numpy as np
+import streamlit as st
+import plotly.express as px
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+import streamlit as st
+from statsmodels.tsa.holtwinters import SimpleExpSmoothing
+import pandas as pd
+import numpy as np
+import streamlit as st
+import plotly.express as px
+from sklearn.linear_model import LinearRegression
+
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
@@ -16,6 +33,10 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 import plotly.graph_objects as go
+from sklearn.linear_model import LinearRegression
+import pandas as pd
+import plotly.express as px
+import streamlit as st
 
 import os
 import json
@@ -224,11 +245,7 @@ k3.metric("⏳ Predicted Avg Lead Time Stock 2025", f"{pred_lead_2025:.2f}")
 
 
 #----------------------------------Graph -------------------------------
-import pandas as pd
-import numpy as np
-import streamlit as st
-import plotly.express as px
-from sklearn.linear_model import LinearRegression
+
 
 predicted_dates = pd.date_range("2025-01-01", "2025-12-01", freq="MS")
 
@@ -302,10 +319,11 @@ with r1c1:
         """)
 
 
+#for second chart
 
+# --- Lead Time Stock Forecasting (Month-wise) ---
 
-# Calculate monthly average lead_time_stock grouped by month and description
-monthly_leadtime_avg = filtered_data.groupby(["month", "description"])["lead_time_stock"].mean().reset_index()
+monthly_leadtime_avg = filtered_data.groupby(["month", "major"])["lead_time_stock"].mean().reset_index()
 
 leadtime_predicted_data = []
 for _, row in monthly_leadtime_avg.iterrows():
@@ -314,96 +332,137 @@ for _, row in monthly_leadtime_avg.iterrows():
             leadtime_predicted_data.append({
                 "txndate": date,
                 "lead_time_stock": row["lead_time_stock"],
-                "description": row["description"]
+                "major": row["major"]
             })
 
 leadtime_predicted_df = pd.DataFrame(leadtime_predicted_data)
 
 with r1c2:
-    st.header("Forecasted Lead Time Stock by Description for 2025")
-    
-    fig = px.bar(leadtime_predicted_df, x="description", y="lead_time_stock",
-                 color="description",
-                 template="plotly_dark",
-                 labels={"lead_time_stock": "Lead Time Stock", "description": "Description"},
-                 title="")
+    st.header("Forecasted Lead Time Stock by Major for 2025")
+
+    fig = px.scatter(
+        leadtime_predicted_df,
+        x="txndate",
+        y="lead_time_stock",
+        color="major",
+        symbol="major",
+        template="plotly_dark",
+        labels={
+            "lead_time_stock": "Lead Time Stock",
+            "txndate": "Month",
+            "major": "Major"
+        },
+        title="Monthly Forecasted Lead Time Stock for Each Major Category (2025)"
+    )
+
+    fig.update_traces(marker=dict(size=10))  # adjust marker size if needed
+    fig.update_layout(xaxis=dict(dtick="M1", tickformat="%b\n%Y"))  # Month format
+
     st.plotly_chart(fig, use_container_width=True)
 
     with st.expander("📘 Story behind this graph"):
-            st.write("""
-            This bar chart shows the **forecasted average lead time stock** for each item description in 2025.
+        st.write("""
+        This scatter chart displays the **forecasted average lead time stock for each major category, month-wise in 2025**.
 
-        - **Lead time stock** refers to the amount of stock you need to cover the lead time period — the time between placing and receiving an order.
-        - The forecast is based on the **historical monthly averages**, mapped onto the corresponding months in 2025..
-            """)
+        - Each point represents the **lead time stock requirement for a specific major in a specific month**.
+        - This visualization helps in understanding how stock requirements vary month-to-month for each major.
+        - The forecast is based on historical monthly averages for each corresponding month.
+        """)
+
 
 # --- Forecasting section for selected description with SARIMAX ---
 # ------------------- FORECASTING FUNCTIONS -------------------
 
 
-import pandas as pd
-import numpy as np
-import streamlit as st
-import plotly.express as px
 
-def random_forecast(ts, steps=12):
-    # Use historical min and max qty to generate random forecast
+# Function to perform Exponential Smoothing Forecasting
+def ets_forecast(ts, steps=365):
     try:
-        min_qty = ts.min()
-        max_qty = ts.max()
-        random_preds = np.random.randint(low=min_qty, high=max_qty+1, size=steps)
-        return pd.Series(random_preds)
+        model = ExponentialSmoothing(ts, trend='add', seasonal='add', seasonal_periods=12)
+        model_fit = model.fit()
+        forecast = model_fit.forecast(steps)
+        return forecast
     except Exception as e:
-        st.error(f"Random forecast error: {e}")
+        st.error(f"ETS model error: {e}")
         return pd.Series([np.nan]*steps)
 
 with r1c3:
-    st.header("Forecast Quantity Month-Wise")                                      
-    descriptions = df["description"].unique()
-    selected_desc = st.selectbox("Select Item Description for Forecasting", sorted(descriptions), key="forecast_desc")
+    st.header("📈 Quantity Forecasting for 2025")
 
-    with st.expander("📘 Story behind this"):
+    # Assume df is pre-loaded DataFrame
+    descriptions = df["description"].unique()
+    df['txndate'] = pd.to_datetime(df['txndate'])
+
+    # Small filters in one row
+    col1, col2, col3 = st.columns([1, 1, 2])  # Adjust widths as needed
+
+    with col1:
+        selected_desc = st.selectbox("Item", sorted(descriptions), key="forecast_desc", label_visibility="collapsed")
+    with col2:
+        month_options = [f"2025-{str(m).zfill(2)}" for m in range(1, 13)]
+        selected_month = st.selectbox("Month", month_options, label_visibility="collapsed")
+    with col3:
+        period_option = st.radio("Period", ["Full Month", "First 7 Days", "First 15 Days"], horizontal=True)
+
+    # Expander Info
+    with st.expander("📘 About this Forecast"):
         st.markdown("""
-        - This graph displays a **randomly generated monthly forecast** (quantity) for a selected item from January to December 2025.
-        - The forecasted quantities are simulated based on the historical minimum and maximum quantities observed.
+        - Forecasts daily quantity for 2025 using Exponential Smoothing (ETS).
+        - Select item, month, and period.
         """)
 
     df_desc = df[df["description"] == selected_desc]
+
     ts_monthly = df_desc.groupby(df_desc["txndate"].dt.to_period("M")).agg({"qty": "sum"})["qty"]
     ts_monthly.index = ts_monthly.index.to_timestamp()
 
-    if len(ts_monthly) < 3:
-        st.warning("Not enough historical data for reliable forecasting.")
+    if len(ts_monthly) < 24:
+        st.warning("At least 24 months of data required for reliable forecast.")
     else:
-        random_pred = random_forecast(ts_monthly, steps=12)
-        months = pd.date_range(start="2025-01-01", periods=12, freq="MS")
+        forecast_days = 365
+        ets_pred = ets_forecast(ts_monthly, steps=forecast_days)
+
+        last_date = ts_monthly.index[-1]
+        forecast_dates = pd.date_range(start=last_date + pd.offsets.MonthBegin(1), periods=forecast_days, freq='D')
+
         forecast_df = pd.DataFrame({
-            "Month": months.strftime("%b"),
-            "Forecasted Quantity": random_pred.values
+            "Date": forecast_dates,
+            "Forecasted Quantity": ets_pred.values
         })
 
-        fig = px.line(
-            forecast_df, 
-            x="Month",
-            y="Forecasted Quantity",
-            markers=True,
-            text="Forecasted Quantity",
-            title="Random Forecast Quantities Monthly",
-            template="plotly_dark"
-        )
-        fig.update_traces(texttemplate='%{text:.0f}', textposition='top center')
-        fig.update_layout(xaxis=dict(tickmode='array', tickvals=forecast_df["Month"]), showlegend=False)
+        sel_year, sel_month = map(int, selected_month.split('-'))
+        mask = (forecast_df['Date'].dt.year == sel_year) & (forecast_df['Date'].dt.month == sel_month)
+        month_forecast = forecast_df.loc[mask]
 
-        st.plotly_chart(fig, use_container_width=True)
+        if month_forecast.empty:
+            st.warning("No forecast data available for the selected month.")
+        else:
+            if period_option == "First 7 Days":
+                period_forecast = month_forecast.iloc[:7]
+            elif period_option == "First 15 Days":
+                period_forecast = month_forecast.iloc[:15]
+            else:  # Full Month
+                period_forecast = month_forecast
+
+            fig = px.line(
+                period_forecast,
+                x="Date",
+                y="Forecasted Quantity",
+                markers=True,
+                title=f"Forecasted Quantity for {selected_month} - {period_option}",
+                template="plotly_dark"
+            )
+            fig.update_traces(texttemplate='%{y:.0f}', textposition='top center')
+            fig.update_layout(showlegend=False)
+
+            st.plotly_chart(fig, use_container_width=True)
 
 
-        
+      
 
 # ------------------- 2nd ROW: Additional 6 Graphs -------------------
 
-import pandas as pd
-import numpy as np
-from sklearn.linear_model import LinearRegression
+
 
 def linear_regression_forecast(ts, steps=12):
     """
@@ -488,10 +547,6 @@ df = df[df["txndate"].dt.year >= 2022]
 # Group by description and month
 monthly_data = df.groupby(["description", "month_index"]).agg({"qty": "sum"}).reset_index()
 
-from sklearn.linear_model import LinearRegression
-import pandas as pd
-import plotly.express as px
-import streamlit as st
 
 
 # Forecast function
@@ -539,15 +594,14 @@ df_2024['date'] = pd.date_range(start='2024-01-01', periods=len(df_2024), freq='
 
 
 # Assume df_2024, aging_options, aging_labels are predefined
-
-
-
+# Display the header above the chart
 
 
 with row1_col1:
     # Nested columns for selectboxes side by side, smaller width
+    st.header(f"Aging Forecast for 2025")
     sel_col1, sel_col2 = st.columns([2, 2])  # adjust ratios for width
-
+    
     with sel_col1:
         descriptions = ['All'] + sorted(df_2024['description'].dropna().unique().tolist())
         selected_desc = st.selectbox("Description", descriptions)
@@ -586,8 +640,6 @@ with row1_col1:
             line=dict(color='orange', width=3)
         ))
 
-        # Display the header above the chart
-        st.header(f"Aging Forecast for 2025")
 
         # Update Plotly figure layout
         fig.update_layout(
@@ -660,63 +712,61 @@ with row1_col3:
 
 # Forecast helper function
 
-import pandas as pd
-import numpy as np
-from sklearn.linear_model import LinearRegression
-import plotly.express as px
-import streamlit as st
 
+# --- Forecast Functions ---
 def linear_regression_forecast(ts, steps=12):
-    """
-    Forecast using Linear Regression.
-    ts: pandas Series with DateTimeIndex.
-    """
     try:
         ts = ts.dropna()
         if len(ts) < 2:
             raise ValueError("Not enough data points for Linear Regression")
-
-        # Time as integer for regression model
         X = np.arange(len(ts)).reshape(-1, 1)
         y = ts.values.reshape(-1, 1)
-
         model = LinearRegression()
         model.fit(X, y)
-
-        # Predict future steps
         future_X = np.arange(len(ts), len(ts) + steps).reshape(-1, 1)
         forecast = model.predict(future_X).flatten()
-
-        # Avoid negatives
         forecast = np.where(forecast < 0, 0, forecast)
-
-        index = pd.date_range(start=ts.index[-1] + pd.offsets.MonthBegin(),
-                              periods=steps, freq='MS')
+        index = pd.date_range(start=ts.index[-1] + pd.offsets.MonthBegin(), periods=steps, freq='MS')
         return pd.Series(forecast, index=index)
-
     except Exception as e:
-        print(f"Forecasting error: {e}")
+        print(f"Linear Regression error: {e}")
         return pd.Series([np.nan] * steps)
 
-# 1) Total monthly predicted quantity for 2025
+def exponential_smoothing_forecast(ts, steps=12):
+    try:
+        ts = ts.dropna()
+        if len(ts) < 2:
+            raise ValueError("Not enough data points for SES")
+        model = SimpleExpSmoothing(ts).fit(optimized=True)
+        forecast = model.forecast(steps)
+        forecast = np.where(forecast < 0, 0, forecast)
+        index = pd.date_range(start=ts.index[-1] + pd.offsets.MonthBegin(), periods=steps, freq='MS')
+        return pd.Series(forecast, index=index)
+    except Exception as e:
+        print(f"SES error: {e}")
+        return pd.Series([np.nan] * steps)
+
+# --- 1. Total Monthly Forecast for 2025 ---
 def forecast_monthly_2025(df, steps=12):
     monthly_forecasts = []
-    desc_list = df["description"].unique()
-    for d in desc_list:
-        df_d = df[df["description"] == d]
-        ts = df_d.groupby(df_d["txndate"].dt.to_period("M")).agg({"qty": "sum"})["qty"]
+    for desc in df["description"].unique():
+        df_desc = df[df["description"] == desc]
+        ts = df_desc.groupby(df_desc["txndate"].dt.to_period("M")).agg({"qty": "sum"})["qty"]
         ts.index = ts.index.to_timestamp()
-        if len(ts) < 3:  # minimum 3 points for regression
+        if len(ts) < 3:
             continue
         fcast = linear_regression_forecast(ts, steps=steps)
         monthly_forecasts.append(fcast)
     if monthly_forecasts:
-        combined_monthly_forecast = pd.concat(monthly_forecasts, axis=1).sum(axis=1)
-        return combined_monthly_forecast
+        return pd.concat(monthly_forecasts, axis=1).sum(axis=1)
     else:
         return pd.Series()
 
+# --- Assume df and top_10_df already exist ---
 monthly_pred_2025 = forecast_monthly_2025(df)
+
+
+
 
 # 2) Monthly forecast trends for top 5 items
 top_5_desc = [desc for desc, _ in top_10[:5]]
@@ -745,6 +795,48 @@ for d in top_10_df["Description"]:
 
 heatmap_array = np.array(heatmap_data)
 
+
+# --- 4. Quantity and Turnover Predictions for Each Item ---
+predicted_data = []
+for desc in top_10_df["Description"]:
+    df_d = df[df["description"] == desc]
+    ts_qty = df_d.groupby(df_d["txndate"].dt.to_period("M")).agg({"qty": "sum"})["qty"]
+    ts_qty.index = ts_qty.index.to_timestamp()
+    if len(ts_qty) < 2:
+        continue
+    qty_forecast = exponential_smoothing_forecast(ts_qty)
+    predicted_total_qty = qty_forecast.sum()
+
+    if "turnover_ratio" in df_d.columns:
+        ts_turn = df_d.groupby(df_d["txndate"].dt.to_period("M")).agg({"turnover_ratio": "mean"})["turnover_ratio"]
+        ts_turn.index = ts_turn.index.to_timestamp()
+        predicted_turnover = exponential_smoothing_forecast(ts_turn).mean() if len(ts_turn) >= 2 else 0
+    else:
+        predicted_turnover = 0
+
+    predicted_data.append({
+        "Description": desc,
+        "Predicted_Total_Qty_2025": predicted_total_qty,
+        "Predicted_Turnover_2025": predicted_turnover
+    })
+
+turnover_pred_2025_df = pd.DataFrame(predicted_data)
+turnover_pred_2025_df.rename(columns={"Predicted_Total_Qty_2025": "Predicted_Total_Qty_2025_forecast"}, inplace=True)
+
+# --- Merge & Create Scatter Plot ---
+merged_df = turnover_pred_2025_df.merge(top_10_df, on="Description", how="inner")
+fig_scatter = px.scatter(
+    merged_df,
+    x="Predicted_Turnover_2025",
+    y="Predicted_Total_Qty_2025_forecast",
+    hover_name="Description",
+    labels={
+        "Predicted_Turnover_2025": "Predicted Turnover Ratio",
+        "Predicted_Total_Qty_2025_forecast": "Predicted Qty"
+    }
+)
+
+
 # STREAMLIT UI BLOCK
 row2_col1, row2_col2, row2_col3 = st.columns(3)
 
@@ -765,29 +857,11 @@ with row2_col1:
         The forecast was generated using a **Linear Regression model** trained on past transaction data. This helps stakeholders identify expected demand trends across the year and plan inventory accordingly.
         """)
 
-# 2. Turnover scatter plot
-merged_df = turnover_pred_2025_df.merge(top_10_df, on="Description", how="inner")
 
-fig_scatter = px.scatter(
-    merged_df,
-    x="Predicted_Turnover_2025",
-    y="Predicted_Total_Qty_2025",
-    hover_name="Description",
-    labels={
-        "Predicted_Turnover_2025": "Predicted Turnover Ratio",
-        "Predicted_Total_Qty_2025": "Predicted Qty"
-    }
-)
 
 with row2_col2:
-    st.header("Turnover Ratio vs Predicted Quantity")
+    st.header("Qty vs Turnover (Top Items)")
     st.plotly_chart(fig_scatter, use_container_width=True)
-    with st.expander("📘 Story behind this"):
-        st.markdown("""
-        This scatter plot shows the relationship between the **predicted turnover ratio** and **predicted quantity** for top items in 2025.
-
-        It helps identify high-volume, high-turnover items that might require special attention for procurement and inventory management.
-        """)
 
 # (Optional: you can use `heatmap_array` for heatmap visualization in row2_col3)
 
