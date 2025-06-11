@@ -797,44 +797,66 @@ heatmap_array = np.array(heatmap_data)
 
 
 # --- 4. Quantity and Turnover Predictions for Each Item ---
+
 predicted_data = []
+
 for desc in top_10_df["Description"]:
     df_d = df[df["description"] == desc]
     ts_qty = df_d.groupby(df_d["txndate"].dt.to_period("M")).agg({"qty": "sum"})["qty"]
     ts_qty.index = ts_qty.index.to_timestamp()
+
     if len(ts_qty) < 2:
-        continue
+        continue  # Skip if not enough data to forecast
+
+    # Forecast Qty
     qty_forecast = exponential_smoothing_forecast(ts_qty)
     predicted_total_qty = qty_forecast.sum()
 
+    # Forecast Turnover if exists
     if "turnover_ratio" in df_d.columns:
         ts_turn = df_d.groupby(df_d["txndate"].dt.to_period("M")).agg({"turnover_ratio": "mean"})["turnover_ratio"]
         ts_turn.index = ts_turn.index.to_timestamp()
-        predicted_turnover = exponential_smoothing_forecast(ts_turn).mean() if len(ts_turn) >= 2 else 0
+        if len(ts_turn) >= 2:
+            turnover_forecast = exponential_smoothing_forecast(ts_turn)
+            predicted_turnover = turnover_forecast.mean()
+        else:
+            turnover_forecast = [0] * 12
+            predicted_turnover = 0
     else:
+        turnover_forecast = [0] * 12
         predicted_turnover = 0
 
+    # Append ALL forecasts in dictionary
     predicted_data.append({
         "Description": desc,
         "Predicted_Total_Qty_2025": predicted_total_qty,
-        "Predicted_Turnover_2025": predicted_turnover
+        "Predicted_Turnover_2025": predicted_turnover,
+        "Qty_Monthly_Forecast": qty_forecast.tolist(),
+        "Turnover_Monthly_Forecast": turnover_forecast
     })
 
+# Convert to DataFrame
 turnover_pred_2025_df = pd.DataFrame(predicted_data)
-turnover_pred_2025_df.rename(columns={"Predicted_Total_Qty_2025": "Predicted_Total_Qty_2025_forecast"}, inplace=True)
 
-# --- Merge & Create Scatter Plot ---
+# --- Merge & Resolve column name clashes ---
+# Before merging, drop 'Predicted_Total_Qty_2025' from top_10_df to prevent _x/_y suffixes
+top_10_df = top_10_df.drop(columns=['Predicted_Total_Qty_2025'], errors='ignore')
+
+# Merge on 'Description'
 merged_df = turnover_pred_2025_df.merge(top_10_df, on="Description", how="inner")
+
+# --- Scatter Plot ---
 fig_scatter = px.scatter(
     merged_df,
     x="Predicted_Turnover_2025",
-    y="Predicted_Total_Qty_2025_forecast",
+    y="Predicted_Total_Qty_2025",
     hover_name="Description",
     labels={
         "Predicted_Turnover_2025": "Predicted Turnover Ratio",
-        "Predicted_Total_Qty_2025_forecast": "Predicted Qty"
+        "Predicted_Total_Qty_2025": "Predicted Quantity"
     }
 )
+
 
 
 # STREAMLIT UI BLOCK
@@ -859,11 +881,64 @@ with row2_col1:
 
 
 
-with row2_col2:
-    st.header("Qty vs Turnover (Top Items)")
-    st.plotly_chart(fig_scatter, use_container_width=True)
+# --- Row 2, Col 2: Qty vs Turnover Scatter Plot for Top Items ---
 
-# (Optional: you can use `heatmap_array` for heatmap visualization in row2_col3)
+with row2_col2:
+# Dropdown for Description Selection in row2_col2
+ row2_col2.header("Forecast Details for Selected Description")
+
+desc_options = turnover_pred_2025_df['Description'].tolist()
+selected_desc = row2_col2.selectbox("Select Description:", desc_options)
+
+selected_row = turnover_pred_2025_df[turnover_pred_2025_df["Description"] == selected_desc]
+
+if not selected_row.empty:
+    months = pd.date_range(start="2025-01-01", periods=12, freq='MS').strftime("%b-%Y")
+
+    # Create Forecast DataFrame
+    forecast_df = pd.DataFrame({
+        "Month": months,
+        "Predicted_Qty": selected_row.iloc[0]["Qty_Monthly_Forecast"],
+        "Predicted_Turnover": selected_row.iloc[0]["Turnover_Monthly_Forecast"]
+    })
+
+    row2_col2.subheader(f"Monthly Forecast for: {selected_desc}")
+    
+
+    # --- Combined Plot for both Qty and Turnover ---
+    fig_combined = go.Figure()
+
+    # Predicted Quantity
+    fig_combined.add_trace(go.Scatter(
+        x=forecast_df["Month"],
+        y=forecast_df["Predicted_Qty"],
+        mode='lines+markers',
+        name='Predicted Quantity',
+        line=dict(color='blue')
+    ))
+
+    # Predicted Turnover
+    fig_combined.add_trace(go.Scatter(
+        x=forecast_df["Month"],
+        y=forecast_df["Predicted_Turnover"],
+        mode='lines+markers',
+        name='Predicted Turnover',
+        line=dict(color='orange')
+    ))
+
+    fig_combined.update_layout(
+        title=f"Predicted Quantity & Turnover (Jan-Dec 2025) for {selected_desc}",
+        xaxis_title="Month",
+        yaxis_title="Value",
+        legend=dict(x=0.8, y=1.15),
+        height=500
+    )
+
+    row2_col2.plotly_chart(fig_combined, use_container_width=True)
+
+else:
+    row2_col2.warning("No forecast available for this item.")
+
 
 
 # Ensure year_month is datetime
